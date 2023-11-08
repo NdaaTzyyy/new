@@ -3,7 +3,6 @@
   "version": "11.0.0",
   "description": "Subscribe My Youtube Channel AkmalMods",
   "main": "connect.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node connect.js"
   },
