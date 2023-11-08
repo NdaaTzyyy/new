@@ -121,7 +121,7 @@ async function Botstarted() {
     } = await useMultiFileAuthState(`./${sessionName}`)
     const { version, isLatest } = await fetchLatestBaileysVersion();
     const msgRetryCounterCache = new NodeCache()
-    const alpha = WADefault({
+    const sock = WADefault({
         version,
         logger: pino({ level: "fatal" }).child({ level: "fatal" }),
         printQRInTerminal: !pairingCode,
@@ -131,7 +131,7 @@ async function Botstarted() {
          creds: state.creds,
          keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
       },
-	    generateHighQualityLinkPreview: true, // make high preview link
+        generateHighQualityLinkPreview: true, // make high preview link
       getMessage: async (key) => {
          let jid = jidNormalizedUser(key.remoteJid)
          let msg = await store.loadMessage(jid, key.id)
@@ -146,24 +146,27 @@ async function Botstarted() {
     nocache('./case', module => console.log(` "${module}" Telah diupdate!`))
     nocache('./settings', module => console.log(` "${module}" Telah diupdate!`))
 
-    store.bind(alpha.ev)
+    store.bind(sock.ev)
 
-    alpha.ev.on('messages.upsert', async chatUpdate => {
+    sock.ev.on('messages.upsert', async chatUpdate => {
         try {
             mek = chatUpdate.messages[0]
             if (!mek.message) return
             mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
             if (mek.key && mek.key.remoteJid === 'status@broadcast') return
-            if (!alpha.public && !mek.key.fromMe && chatUpdate.type === 'notify') return
+            if (!sock
+    .public && !mek.key.fromMe && chatUpdate.type === 'notify') return
             if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) return
-            m = smsg(alpha, mek, store)
-            require("./case")(alpha, m, chatUpdate, store, antilink, antiwame, antilink2, antiwame2, set_welcome_db, set_left_db, set_open, set_close, _welcome, _left)
+            m = smsg(sock
+    , mek, store)
+            require("./case")(sock
+    , m, chatUpdate, store, antilink, antiwame, antilink2, antiwame2, set_welcome_db, set_left_db, set_open, set_close, _welcome, _left)
         }
         catch (err) {
             console.log(err)
         }
     })
-    if (pairingCode && !alpha.authState.creds.registered) {
+    if (pairingCode && !sock.authState.creds.registered) {
       if (useMobile) throw new Error('Cannot use pairing code with mobile api')
 
       let phoneNumber
@@ -189,29 +192,33 @@ async function Botstarted() {
       }
 
       setTimeout(async () => {
-         let code = await alpha.requestPairingCode(phoneNumber)
+         let code = await sock
+    .requestPairingCode(phoneNumber)
          code = code?.match(/.{1,4}/g)?.join("-") || code
          console.log(`Your Pairing Code : `, code)
       }, 3000)
     }
-    alpha.ev.on('group-participants.update', async (anu) => {
+    sock.ev.on('group-participants.update', async (anu) => {
         const isWelcome = _welcome.includes(anu.id)
         const isLeft = _left.includes(anu.id)
         try {
-            let metadata = await alpha.groupMetadata(anu.id)
+            let metadata = await sock
+    .groupMetadata(anu.id)
             let participants = anu.participants
             const groupName = metadata.subject
             const groupDesc = metadata.desc
             for (let num of participants) {
                 try {
-                    ppuser = await alpha.profilePictureUrl(num, 'image')
+                    ppuser = await sock
+            .profilePictureUrl(num, 'image')
                 }
                 catch {
                     ppuser = 'https://telegra.ph/file/c3f3d2c2548cbefef1604.jpg'
                 }
 
                 try {
-                    ppgroup = await alpha.profilePictureUrl(anu.id, 'image')
+                    ppgroup = await sock
+            .profilePictureUrl(anu.id, 'image')
                 }
                 catch {
                     ppgroup = 'https://telegra.ph/file/c3f3d2c2548cbefef1604.jpg'
@@ -264,7 +271,8 @@ async function Botstarted() {
                             mentions: [num]
                         }
 
-                        alpha.sendMessage(anu.id, {image: welcome, caption: full_pesan, mentions: [num]}, {})
+                        sock
+                .sendMessage(anu.id, {image: welcome, caption: full_pesan, mentions: [num]}, {})
                     }
                     else {
                         const buttonMessage = {
@@ -276,7 +284,8 @@ async function Botstarted() {
                             mentions: [num]
                         }
 
-                        alpha.sendMessage(anu.id, {image: welcome, caption: `Halo @${num.split("@")[0]}, Welcome To ${metadata.subject}`, mentions: [num]}, {})
+                        sock
+                .sendMessage(anu.id, {image: welcome, caption: `Halo @${num.split("@")[0]}, Welcome To ${metadata.subject}`, mentions: [num]}, {})
                     }
                 }
                 else if (anu.action == 'remove' && isLeft) {
@@ -327,7 +336,8 @@ async function Botstarted() {
                             mentions: [num]
                         }
 
-                        alpha.sendMessage(anu.id, {image: goobye, caption: full_pesan, mentions: [num]}, {})
+                        sock
+                .sendMessage(anu.id, {image: goobye, caption: full_pesan, mentions: [num]}, {})
                     }
                     else {
                         const buttonMessage = {
@@ -339,7 +349,8 @@ async function Botstarted() {
                             mentions: [num]
                         }
 
-                        alpha.sendMessage(anu.id, {image: goobye, caption: `Sayonara @${num.split("@")[0]}, doa terbaik untukmu kawan`, mentions: [num]}, {})
+                        sock
+                .sendMessage(anu.id, {image: goobye, caption: `Sayonara @${num.split("@")[0]}, doa terbaik untukmu kawan`, mentions: [num]}, {})
                     }
                 }
             }
@@ -350,7 +361,7 @@ async function Botstarted() {
     })
 
     // Setting
-    alpha.decodeJid = (jid) => {
+    sock.decodeJid = (jid) => {
         if (!jid) return jid
         if (/:\d+@/gi.test(jid)) {
             let decode = jidDecode(jid) || {}
@@ -359,9 +370,10 @@ async function Botstarted() {
         else return jid
     }
 
-    alpha.ev.on('contacts.update', update => {
+    sock.ev.on('contacts.update', update => {
         for (let contact of update) {
-            let id = alpha.decodeJid(contact.id)
+            let id = sock
+    .decodeJid(contact.id)
             if (store && store.contacts) store.contacts[id] = {
                 id,
                 name: contact.notify
@@ -369,33 +381,43 @@ async function Botstarted() {
         }
     })
 
-    alpha.getName = (jid, withoutContact = false) => {
-        id = alpha.decodeJid(jid)
-        withoutContact = alpha.withoutContact || withoutContact
+    sock.getName = (jid, withoutContact = false) => {
+        id = sock
+.decodeJid(jid)
+        withoutContact = sock
+.withoutContact || withoutContact
         let v
         if (id.endsWith("@g.us")) return new Promise(async (resolve) => {
             v = store.contacts[id] || {}
-            if (!(v.name || v.subject)) v = alpha.groupMetadata(id) || {}
+            if (!(v.name || v.subject)) v = sock
+    .groupMetadata(id) || {}
             resolve(v.name || v.subject || PhoneNumber('+' + id.replace('@s.whatsapp.net', '')).getNumber('international'))
         })
         else v = id === '0@s.whatsapp.net' ? {
                 id,
                 name: 'WhatsApp'
-            } : id === alpha.decodeJid(alpha.user.id) ?
-            alpha.user :
+            } : id === sock
+    .decodeJid(sock
+    .user.id) ?
+            sock
+    .user :
             (store.contacts[id] || {})
         return (withoutContact ? '' : v.name) || v.subject || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
     }
 
-    alpha.sendContact = async (jid, kon, quoted = '', opts = {}) => {
+    sock.sendContact = async (jid, kon, quoted = '', opts = {}) => {
         let list = []
         for (let i of kon) {
             list.push({
-                displayName: await alpha.getName(i + '@s.whatsapp.net'),
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${await alpha.getName(i + '@s.whatsapp.net')}\nFN:${await alpha.getName(i + '@s.whatsapp.net')}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+                displayName: await sock
+        .getName(i + '@s.whatsapp.net'),
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${await sock
+        .getName(i + '@s.whatsapp.net')}\nFN:${await sock
+        .getName(i + '@s.whatsapp.net')}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
             })
         }
-        alpha.sendMessage(jid, {
+        sock
+.sendMessage(jid, {
             contacts: {
                 displayName: `${list.length} Kontak`,
                 contacts: list
@@ -406,11 +428,11 @@ async function Botstarted() {
         })
     }
 
-    alpha.public = true
+    sock.public = true
 
-    alpha.serializeM = (m) => smsg(alpha, m, store)
+    sock.serializeM = (m) => smsg(sock, m, store)
 
-    alpha.ev.on('connection.update', async (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const {
             connection,
             lastDisconnect
@@ -419,7 +441,8 @@ async function Botstarted() {
             let reason = new Boom(lastDisconnect?.error)?.output.statusCode
             if (reason === DisconnectReason.badSession) {
                 console.log(`Bad Session File, Please Delete Session and Scan Again`);
-                alpha.logout();
+                sock
+        .logout();
             }
             else if (reason === DisconnectReason.connectionClosed) {
                 console.log("Connection closed, reconnecting....");
@@ -435,7 +458,8 @@ async function Botstarted() {
             }
             else if (reason === DisconnectReason.loggedOut) {
                 console.log(`Device Logged Out, Please Scan Again And Run.`);
-                alpha.logout();
+                sock
+        .logout();
             }
             else if (reason === DisconnectReason.restartRequired) {
                 console.log("Restart Required, Restarting...");
@@ -447,18 +471,21 @@ async function Botstarted() {
             }
             else if (reason === DisconnectReason.Multidevicemismatch) {
                 console.log("Multi device mismatch, please scan again");
-                alpha.logout();
+                sock
+        .logout();
             }
-            else alpha.end(`Unknown DisconnectReason: ${reason}|${connection}`)
+            else sock
+    .end(`Unknown DisconnectReason: ${reason}|${connection}`)
         }
         if (update.connection == "open" || update.receivedPendingNotifications == "true") {
-            console.log(`Connected to = ` + JSON.stringify(alpha.user, null, 2))
+            console.log(`Connected to = ` + JSON.stringify(sock
+    .user, null, 2))
         }
     })
 
-    alpha.ev.on('creds.update', saveCreds)
+    sock.ev.on('creds.update', saveCreds)
 
-    alpha.sendText = (jid, text, quoted = '', options) => alpha.sendMessage(jid, {
+    sock.sendText = (jid, text, quoted = '', options) => sock.sendMessage(jid, {
         text: text,
         ...options
     }, {
@@ -466,7 +493,7 @@ async function Botstarted() {
         ...options
     })
 
-    alpha.downloadMediaMessage = async (message) => {
+    sock.downloadMediaMessage = async (message) => {
         let mime = (message.msg || message).mimetype || ''
         let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
         const stream = await downloadContentFromMessage(message, messageType)
@@ -478,7 +505,7 @@ async function Botstarted() {
         return buffer
     }
 
-    alpha.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
+    sock.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
 
         let quoted = message.msg ? message.msg : message
 
@@ -495,14 +522,14 @@ async function Botstarted() {
         await fs.writeFileSync(trueFileName, buffer)
         return trueFileName
     }
-    alpha.sendTextWithMentions = async (jid, text, quoted, options = {}) => alpha.sendMessage(jid, {
+    sock.sendTextWithMentions = async (jid, text, quoted, options = {}) => sock.sendMessage(jid, {
         text: text,
         mentions: [...text.matchAll(/@(\d{0,16})/g)].map(v => v[1] + '@s.whatsapp.net'),
         ...options
     }, {
         quoted
     })
-    alpha.getFile = async (PATH, returnAsFilename) => {
+    sock.getFile = async (PATH, returnAsFilename) => {
         let res, filename
         const data = Buffer.isBuffer(PATH) ? PATH : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split`,` [1], 'base64') : /^https?:\/\//.test(PATH) ? await (res = await fetch(PATH)).buffer() : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0)
         if (!Buffer.isBuffer(data)) throw new TypeError('Result is not a buffer')
@@ -522,8 +549,9 @@ async function Botstarted() {
         }
     }
 
-    alpha.sendFile = async (jid, path, filename = '', caption = '', quoted, ptt = false, options = {}) => {
-        let type = await alpha.getFile(path, true)
+    sock.sendFile = async (jid, path, filename = '', caption = '', quoted, ptt = false, options = {}) => {
+        let type = await sock
+.getFile(path, true)
         let {
             res,
             data: file,
@@ -577,7 +605,8 @@ async function Botstarted() {
         }
         let m
         try {
-            m = await alpha.sendMessage(jid, message, {
+            m = await sock
+    .sendMessage(jid, message, {
                 ...opt,
                 ...options
             })
@@ -587,7 +616,8 @@ async function Botstarted() {
             m = null
         }
         finally {
-            if (!m) m = await alpha.sendMessage(jid, {
+            if (!m) m = await sock
+    .sendMessage(jid, {
                 ...message,
                 [mtype]: file
             }, {
@@ -598,15 +628,17 @@ async function Botstarted() {
             return m
         }
     }
-    alpha.sendMedia = async (jid, path, filename, quoted = '', options = {}) => {
+    sock.sendMedia = async (jid, path, filename, quoted = '', options = {}) => {
         let {
             ext,
             mime,
             data
-        } = await alpha.getFile(path)
+        } = await sock
+.getFile(path)
         messageType = mime.split("/")[0]
         pase = messageType.replace('application', 'document') || messageType
-        return await alpha.sendMessage(jid, {
+        return await sock
+.sendMessage(jid, {
             [`${pase}`]: data,
             mimetype: mime,
             fileName: filename + ext ? filename + ext : getRandom(ext),
@@ -615,12 +647,13 @@ async function Botstarted() {
             quoted
         })
     }
-    alpha.sendMediaAsSticker = async (jid, path, quoted, options = {}) => {
+    sock.sendMediaAsSticker = async (jid, path, quoted, options = {}) => {
       let {
          ext,
          mime,
          data
-      } = await alpha.getFile(path)
+      } = await sock
+.getFile(path)
       let media = {}
       let buffer
       media.data = data
@@ -630,7 +663,8 @@ async function Botstarted() {
       } else {
          buffer = /image/.test(mime) ? await imageToWebp(data) : /video/.test(mime) ? await videoToWebp(data) : ""
       }
-      await alpha.sendMessage(jid, {
+      await sock
+.sendMessage(jid, {
          sticker: {
             url: buffer
          },
@@ -640,7 +674,7 @@ async function Botstarted() {
       })
       return buffer
    }
-    alpha.sendImageAsSticker = async (jid, path, quoted, options = {}) => {
+    sock.sendImageAsSticker = async (jid, path, quoted, options = {}) => {
         let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,` [1], 'base64') : /^https?:\/\//.test(path) ? await (await fetch(path)).buffer() : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
         let buffer
         if (options && (options.packname || options.author)) {
@@ -650,7 +684,8 @@ async function Botstarted() {
             buffer = await imageToWebp(buff)
         }
 
-        await alpha.sendMessage(jid, {
+        await sock
+.sendMessage(jid, {
             sticker: {
                 url: buffer
             },
@@ -661,7 +696,7 @@ async function Botstarted() {
         return buffer
     }
 
-    alpha.sendVideoAsSticker = async (jid, path, quoted, options = {}) => {
+    sock.sendVideoAsSticker = async (jid, path, quoted, options = {}) => {
         let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,` [1], 'base64') : /^https?:\/\//.test(path) ? await getBuffer(path) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
         let buffer
         if (options && (options.packname || options.author)) {
@@ -671,7 +706,8 @@ async function Botstarted() {
             buffer = await videoToWebp(buff)
         }
 
-        await alpha.sendMessage(jid, {
+        await sock
+.sendMessage(jid, {
             sticker: {
                 url: buffer
             },
@@ -681,7 +717,7 @@ async function Botstarted() {
         })
         return buffer
     }
-    alpha.sendButtonText = (jid, buttons = [], text, footer, quoted = '', options = {}) => {
+    sock.sendButtonText = (jid, buttons = [], text, footer, quoted = '', options = {}) => {
         let buttonMessage = {
             text,
             footer,
@@ -689,12 +725,13 @@ async function Botstarted() {
             headerType: 2,
             ...options
         }
-        alpha.sendMessage(jid, buttonMessage, {
+        sock
+.sendMessage(jid, buttonMessage, {
             quoted,
             ...options
         })
     }
-    alpha.send1ButMes = (jid, text = '', footer = '', butId = '', dispText = '', quoted, ments) => {
+    sock.send1ButMes = (jid, text = '', footer = '', butId = '', dispText = '', quoted, ments) => {
         let but = [{
             buttonId: butId,
             buttonText: {
@@ -708,12 +745,13 @@ async function Botstarted() {
             footer: footer,
             mentions: ments ? ments : []
         }
-        alpha.sendMessage(jid, butMes, {
+        sock
+.sendMessage(jid, butMes, {
             quoted: quoted
         })
     }
 
-    alpha.sendButImage = async (jid, link, but = [], text = '', footer = '', ments = [], quoted) => {
+    sock.sendButImage = async (jid, link, but = [], text = '', footer = '', ments = [], quoted) => {
         let dlimage;
         try {
             dlimage = await getBuffer(link)
@@ -730,9 +768,10 @@ async function Botstarted() {
             mentions: ments
         }
 
-        alpha.sendMessage(jid, buttonMessage, quoted)
+        sock
+.sendMessage(jid, buttonMessage, quoted)
     }
-    alpha.sendFakeLink = (jid, text, salam, footer_text, pp_bot, myweb, pushname, quoted) => alpha.sendMessage(jid, {
+    sock.sendFakeLink = (jid, text, salam, footer_text, pp_bot, myweb, pushname, quoted) => sock.sendMessage(jid, {
         text: text,
         contextInfo: {
             "externalAdReply": {
@@ -748,7 +787,7 @@ async function Botstarted() {
         quoted
     })
 
-    return alpha
+    return sock
 }
 
 Botstarted()
