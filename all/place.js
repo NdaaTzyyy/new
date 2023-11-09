@@ -23,9 +23,9 @@ console.log(`Error in getBuffer: ${e}`)
 }
 
 exports.makeWASocket = (connectionOptions, options = {}) => {
-const basenewkirbotz = makeWASocket(connectionOptions)
+const sock = makeWASocket(connectionOptions)
 
-basenewkirbotz.inspectLink = async (code) => {
+sock.inspectLink = async (code) => {
         const extractGroupInviteMetadata = (content) => {
         const group = getBinaryNodeChild(content, "group");
         const descChild = getBinaryNodeChild(group, "description");
@@ -45,7 +45,7 @@ basenewkirbotz.inspectLink = async (code) => {
         };
         return metadata;
         }
-        let results = await basenewkirbotz.query({
+        let results = await sock.query({
         tag: "iq",
         attrs: {
         type: "get",
@@ -60,9 +60,9 @@ basenewkirbotz.inspectLink = async (code) => {
 function updateNameToDb(contacts) {
         if (!contacts) return
         for (let contact of contacts) {
-        let id = basenewkirbotz.decodeJid(contact.id)
+        let id = sock.decodeJid(contact.id)
         if (!id) continue
-        let chats = basenewkirbotz.contacts[id]
+        let chats = sock.contacts[id]
         if (!chats) chats = { id }
         let chat = {
         ...chats,
@@ -72,22 +72,22 @@ function updateNameToDb(contacts) {
         { name: contact.notify || chats.name || chats.notify || '' })
         } || {})
         }
-        basenewkirbotz.contacts[id] = chat
+        sock.contacts[id] = chat
         }
 }
 
-basenewkirbotz.ev.on('contacts.upsert', updateNameToDb)
-basenewkirbotz.ev.on('groups.update', updateNameToDb)
+sock.ev.on('contacts.upsert', updateNameToDb)
+sock.ev.on('groups.update', updateNameToDb)
 
-basenewkirbotz.loadMessage = (messageID) => {
-        return Object.entries(basenewkirbotz.chats)
+sock.loadMessage = (messageID) => {
+        return Object.entries(sock.chats)
         .filter(([_, { messages }]) => typeof messages === 'object')
         .find(([_, { messages }]) => Object.entries(messages)
         .find(([k, v]) => (k === messageID || v.key?.id === messageID)))
         ?.[1].messages?.[messageID]
 }
 
-basenewkirbotz.decodeJid = (jid) => {
+sock.decodeJid = (jid) => {
         if (!jid) return jid
         if (/:\d+@/gi.test(jid)) {
         let decode = jidDecode(jid) || {}
@@ -95,26 +95,26 @@ basenewkirbotz.decodeJid = (jid) => {
         } else return jid
 }
 
-if (basenewkirbotz.user && basenewkirbotz.user.id) basenewkirbotz.user.jid = basenewkirbotz.decodeJid(basenewkirbotz.user.id)
-basenewkirbotz.chats = {}
-basenewkirbotz.contacts = {}
+if (sock.user && sock.user.id) sock.user.jid = sock.decodeJid(sock.user.id)
+sock.chats = {}
+sock.contacts = {}
 
-basenewkirbotz.sendMessageV2 = async (chatId, message, options = {}) => {
+sock.sendMessageV2 = async (chatId, message, options = {}) => {
         let generate = await generateWAMessage(chatId, message, options)
         let type2 = getContentType(generate.message)
         if ('contextInfo' in options) generate.message[type2].contextInfo = options?.contextInfo
         if ('contextInfo' in message) generate.message[type2].contextInfo = message?.contextInfo
-        return await basenewkirbotz.relayMessage(chatId, generate.message, { messageId: generate.key.id })
+        return await sock.relayMessage(chatId, generate.message, { messageId: generate.key.id })
 }
 
-basenewkirbotz.logger = {
-        ...basenewkirbotz.logger,
+sock.logger = {
+        ...sock.logger,
         info(...args) { console.log(chalk.bold.rgb(57, 183, 16)(`INFO [${chalk.rgb(255, 255, 255)(new Date())}]:`), chalk.cyan(...args)) },
         error(...args) { console.log(chalk.bold.rgb(247, 38, 33)(`ERROR [${chalk.rgb(255, 255, 255)(new Date())}]:`), chalk.rgb(255, 38, 0)(...args)) },
         warn(...args) { console.log(chalk.bold.rgb(239, 225, 3)(`WARNING [${chalk.rgb(255, 255, 255)(new Date())}]:`), chalk.keyword('orange')(...args)) }
 }
    
-basenewkirbotz.getFile = async (PATH, returnAsFilename) => {
+sock.getFile = async (PATH, returnAsFilename) => {
         let res, filename
         let data = Buffer.isBuffer(PATH) ? PATH : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split`,`[1], 'base64') : /^https?:\/\//.test(PATH) ? await (res = await fetch(PATH)).buffer() : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0)
         if (!Buffer.isBuffer(data)) throw new TypeError('Result is not a buffer')
@@ -131,35 +131,35 @@ basenewkirbotz.getFile = async (PATH, returnAsFilename) => {
         }
 }
 
-basenewkirbotz.waitEvent = (eventName, is = () => true, maxTries = 25) => {
+sock.waitEvent = (eventName, is = () => true, maxTries = 25) => {
         return new Promise((resolve, reject) => {
         let tries = 0
         let on = (...args) => {
         if (++tries > maxTries) reject('Max tries reached')
         else if (is()) {
-        basenewkirbotz.ev.off(eventName, on)
+        sock.ev.off(eventName, on)
         resolve(...args)
         }
         }
-        basenewkirbotz.ev.on(eventName, on)
+        sock.ev.on(eventName, on)
         })
 }
 
-basenewkirbotz.sendMedia = async (jid, path, quoted, options = {}) => {
-        let { ext, mime, data } = await basenewkirbotz.getFile(path)
+sock.sendMedia = async (jid, path, quoted, options = {}) => {
+        let { ext, mime, data } = await sock.getFile(path)
         messageType = mime.split("/")[0]
         pase = messageType.replace('application', 'document') || messageType
-        return await basenewkirbotz.sendMessage(jid, { [`${pase}`]: data, mimetype: mime, ...options }, { quoted })
+        return await sock.sendMessage(jid, { [`${pase}`]: data, mimetype: mime, ...options }, { quoted })
 }
 
-basenewkirbotz.sendContact = async (jid, number, name, quoted, options) => {
+sock.sendContact = async (jid, number, name, quoted, options) => {
         let njid = number.replace(new RegExp("[()+-/ +/]", "gi"), "") + `@s.whatsapp.net` 
         let vcard = `BEGIN:VCARD
         VERSION:3.0
         FN:Koi
         TEL;type=CELL;type=VOICE;waid=${number}:${PhoneNumber('+' + number).getNumber('international')}
         END:VCARD`
-        return await basenewkirbotz.sendMessage(jid, {
+        return await sock.sendMessage(jid, {
         contacts: {
         displayName: `${name}`,
         contacts: [{  }],
@@ -172,8 +172,8 @@ basenewkirbotz.sendContact = async (jid, number, name, quoted, options) => {
         })
 }
 
-basenewkirbotz.setStatus = async (status) => {
-        return await basenewkirbotz.query({
+sock.setStatus = async (status) => {
+        return await sock.query({
         tag: 'iq',
         attrs: {
         to: 's.whatsapp.net',
@@ -190,11 +190,11 @@ basenewkirbotz.setStatus = async (status) => {
         })
 }
 
-basenewkirbotz.reply = (jid, text = '', quoted, options) => {
-        return Buffer.isBuffer(text) ? this.sendFile(jid, text, 'file', '', quoted, false, options) : basenewkirbotz.sendMessage(jid, { ...options, text }, { quoted, ...options })
+sock.reply = (jid, text = '', quoted, options) => {
+        return Buffer.isBuffer(text) ? this.sendFile(jid, text, 'file', '', quoted, false, options) : sock.sendMessage(jid, { ...options, text }, { quoted, ...options })
 }
 
-basenewkirbotz.sendStimg = async (jid, path, quoted, options = {}) => {
+sock.sendStimg = async (jid, path, quoted, options = {}) => {
         let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await fetch(path)).buffer() : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
         let buffer
         if (options && (options.packname || options.author)) {
@@ -202,11 +202,11 @@ basenewkirbotz.sendStimg = async (jid, path, quoted, options = {}) => {
         } else {
             buffer = await imageToWebp(buff)
         }
-        await basenewkirbotz.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
+        await sock.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
         return buffer
 }
     
-basenewkirbotz.sendStvid = async (jid, path, quoted, options = {}) => {
+sock.sendStvid = async (jid, path, quoted, options = {}) => {
         let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await getBuffer(path) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
         let buffer
         if (options && (options.packname || options.author)) {
@@ -214,11 +214,11 @@ basenewkirbotz.sendStvid = async (jid, path, quoted, options = {}) => {
         } else {
             buffer = await videoToWebp(buff)
         }
-        await basenewkirbotz.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
+        await sock.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
         return buffer
 }
 
-basenewkirbotz.sendGroupV4Invite = async(jid, participant, inviteCode, inviteExpiration, groupName = 'unknown subject', caption = 'Invitation to join my WhatsApp group', options = {}) => {
+sock.sendGroupV4Invite = async(jid, participant, inviteCode, inviteExpiration, groupName = 'unknown subject', caption = 'Invitation to join my WhatsApp group', options = {}) => {
         let msg = proto.Message.fromObject({
         groupInviteMessage: proto.GroupInviteMessage.fromObject({
         inviteCode,
@@ -233,7 +233,7 @@ basenewkirbotz.sendGroupV4Invite = async(jid, participant, inviteCode, inviteExp
         return message
 }
 
-basenewkirbotz.cMod = async (jid, message, text = '', sender = basenewkirbotz.user.jid, options = {}) => {
+sock.cMod = async (jid, message, text = '', sender = sock.user.jid, options = {}) => {
         if (options.mentions && !Array.isArray(options.mentions)) options.mentions = [options.mentions]
         let copy = message.toJSON()
         delete copy.message.messageContextInfo
@@ -256,20 +256,20 @@ basenewkirbotz.cMod = async (jid, message, text = '', sender = basenewkirbotz.us
         if (copy.key.remoteJid.includes('@s.whatsapp.net')) sender = sender || copy.key.remoteJid
         else if (copy.key.remoteJid.includes('@broadcast')) sender = sender || copy.key.remoteJid
         copy.key.remoteJid = jid
-        copy.key.fromMe = areJidsSameUser(sender, basenewkirbotz.user.id) || false
+        copy.key.fromMe = areJidsSameUser(sender, sock.user.id) || false
         return proto.WebMessageInfo.fromObject(copy)
 }
     
-basenewkirbotz.copyNForward = async (jid, message, forwardingScore = true, options = {}) => {
+sock.copyNForward = async (jid, message, forwardingScore = true, options = {}) => {
         let m = generateForwardMessageContent(message, !!forwardingScore)
         let mtype = Object.keys(m)[0]
         if (forwardingScore && typeof forwardingScore == 'number' && forwardingScore > 1) m[mtype].contextInfo.forwardingScore += forwardingScore
-        m = generateWAMessageFromContent(jid, m, { ...options, userJid: basenewkirbotz.user.id })
-        await basenewkirbotz.relayMessage(jid, m.message, { messageId: m.key.id, additionalAttributes: { ...options } })
+        m = generateWAMessageFromContent(jid, m, { ...options, userJid: sock.user.id })
+        await sock.relayMessage(jid, m.message, { messageId: m.key.id, additionalAttributes: { ...options } })
         return m
 }
     
-basenewkirbotz.downloadM = async (m, type, filename = '') => {
+sock.downloadM = async (m, type, filename = '') => {
         if (!m || !(m.url || m.directPath)) return Buffer.alloc(0)
         const stream = await downloadContentFromMessage(m, type)
         let buffer = Buffer.from([])
@@ -280,7 +280,7 @@ basenewkirbotz.downloadM = async (m, type, filename = '') => {
         return filename && fs.existsSync(filename) ? filename : buffer
 }
     
-basenewkirbotz.downloadMed = async (message, filename, attachExtension = true) => {
+sock.downloadMed = async (message, filename, attachExtension = true) => {
         let mime = (message.msg || message).mimetype || ''
         let messageType = mime.split('/')[0].replace('application', 'document') ? mime.split('/')[0].replace('application', 'document') : mime.split('/')[0]
         const stream = await downloadContentFromMessage(message, messageType)
@@ -294,49 +294,49 @@ basenewkirbotz.downloadMed = async (message, filename, attachExtension = true) =
         return trueFileName
 }
 
-basenewkirbotz.chatRead = async (jid, participant, messageID) => {
-        return await basenewkirbotz.sendReadReceipt(jid, participant, [messageID])
+sock.chatRead = async (jid, participant, messageID) => {
+        return await sock.sendReadReceipt(jid, participant, [messageID])
 }
 
-basenewkirbotz.parseMention = (text = '') => {
+sock.parseMention = (text = '') => {
         return [...text.matchAll(/@([0-9]{5,16}|0)/g)].map(v => v[1] + '@s.whatsapp.net')
 }
 
-basenewkirbotz.saveName = async (id, name = '') => {
+sock.saveName = async (id, name = '') => {
         if (!id) return
-        id = basenewkirbotz.decodeJid(id)
+        id = sock.decodeJid(id)
         let isGroup = id.endsWith('@g.us')
-        if (id in basenewkirbotz.contacts && basenewkirbotz.contacts[id][isGroup ? 'subject' : 'name'] && id in basenewkirbotz.chats) return
+        if (id in sock.contacts && sock.contacts[id][isGroup ? 'subject' : 'name'] && id in sock.chats) return
         let metadata = {}
-        if (isGroup) metadata = await basenewkirbotz.groupMetadata(id)
-        let chat = { ...(basenewkirbotz.contacts[id] || {}), id, ...(isGroup ? { subject: metadata.subject, desc: metadata.desc } : { name }) }
-        basenewkirbotz.contacts[id] = chat
-        basenewkirbotz.chats[id] = chat
+        if (isGroup) metadata = await sock.groupMetadata(id)
+        let chat = { ...(sock.contacts[id] || {}), id, ...(isGroup ? { subject: metadata.subject, desc: metadata.desc } : { name }) }
+        sock.contacts[id] = chat
+        sock.chats[id] = chat
 }
 
-basenewkirbotz.getName = async (jid = '', withoutContact = false) => {
-        jid = basenewkirbotz.decodeJid(jid)
-        withoutContact = basenewkirbotz.withoutContact || withoutContact
+sock.getName = async (jid = '', withoutContact = false) => {
+        jid = sock.decodeJid(jid)
+        withoutContact = sock.withoutContact || withoutContact
         let v
         if (jid.endsWith('@g.us')) return new Promise(async (resolve) => {
-        v = basenewkirbotz.chats[jid] || {}
-        if (!(v.name || v.subject)) v = await basenewkirbotz.groupMetadata(jid) || {}
+        v = sock.chats[jid] || {}
+        if (!(v.name || v.subject)) v = await sock.groupMetadata(jid) || {}
         resolve(v.name || v.subject || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international'))
         })
         else v = jid === '0@s.whatsapp.net' ? {
         jid,
         vname: 'WhatsApp'
-        } : areJidsSameUser(jid, basenewkirbotz.user.id) ?
-        basenewkirbotz.user :
-        (basenewkirbotz.chats[jid] || {})
+        } : areJidsSameUser(jid, sock.user.id) ?
+        sock.user :
+        (sock.chats[jid] || {})
         return (withoutContact ? '' : v.name) || v.subject || v.vname || v.notify || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international').replace(new RegExp("[()+-/ +/]", "gi"), "") 
 }
 
-basenewkirbotz.mess = [];
+sock.mess = [];
     
-basenewkirbotz.processMessageStubType = async(m) => {
+sock.processMessageStubType = async(m) => {
         if (!m.messageStubType) return
-        const chat = basenewkirbotz.decodeJid(m.key.remoteJid || m.message?.senderKeyDistributionMessage?.groupId || '')
+        const chat = sock.decodeJid(m.key.remoteJid || m.message?.senderKeyDistributionMessage?.groupId || '')
         if (!chat || chat === 'status@broadcast') return
         const emitGroupUpdate = (update) => {
         ev.emit('groups.update', [{ id: chat, ...update }])
@@ -360,37 +360,37 @@ basenewkirbotz.processMessageStubType = async(m) => {
         }
         const isGroup = chat.endsWith('@g.us')
         if (!isGroup) return
-        let chats = basenewkirbotz.chats[chat]
-        if (!chats) chats = basenewkirbotz.chats[chat] = { id: chat }
+        let chats = sock.chats[chat]
+        if (!chats) chats = sock.chats[chat] = { id: chat }
         chats.isChats = true
-        const metadata = await basenewkirbotz.groupMetadata(chat).catch(_ => null)
+        const metadata = await sock.groupMetadata(chat).catch(_ => null)
         if (!metadata) return
         chats.subject = metadata.subject
         chats.metadata = metadata
 }
 
-basenewkirbotz.insertAllGroup = async() => {
-        const groups = await basenewkirbotz.groupFetchAllParticipating().catch(_ => null) || {}
-        for (const group in groups) basenewkirbotz.chats[group] = { ...(basenewkirbotz.chats[group] || {}), id: group, subject: groups[group].subject, isChats: true, metadata: groups[group] }
-        return basenewkirbotz.chats
+sock.insertAllGroup = async() => {
+        const groups = await sock.groupFetchAllParticipating().catch(_ => null) || {}
+        for (const group in groups) sock.chats[group] = { ...(sock.chats[group] || {}), id: group, subject: groups[group].subject, isChats: true, metadata: groups[group] }
+        return sock.chats
 }
 
-basenewkirbotz.pushMessage = async(m) => {
+sock.pushMessage = async(m) => {
         if (!m) return
         if (!Array.isArray(m)) m = [m]
         for (const message of m) {
         try {
         if (!message) continue
-        if (message.messageStubType && message.messageStubType != WAMessageStubType.CIPHERTEXT) basenewkirbotz.processMessageStubType(message).catch(console.error)
+        if (message.messageStubType && message.messageStubType != WAMessageStubType.CIPHERTEXT) sock.processMessageStubType(message).catch(console.error)
         const _mtype = Object.keys(message.message || {})
         const mtype = (!['senderKeyDistributionMessage', 'messageContextInfo'].includes(_mtype[0]) && _mtype[0]) ||
         (_mtype.length >= 3 && _mtype[1] !== 'messageContextInfo' && _mtype[1]) ||
         _mtype[_mtype.length - 1]
-        const chat = basenewkirbotz.decodeJid(message.key.remoteJid || message.message?.senderKeyDistributionMessage?.groupId || '')
+        const chat = sock.decodeJid(message.key.remoteJid || message.message?.senderKeyDistributionMessage?.groupId || '')
         if (message.message?.[mtype]?.contextInfo?.quotedMessage) {
         let context = message.message[mtype].contextInfo
-        let participant = basenewkirbotz.decodeJid(context.participant)
-        const remoteJid = basenewkirbotz.decodeJid(context.remoteJid || participant)
+        let participant = sock.decodeJid(context.participant)
+        const remoteJid = sock.decodeJid(context.remoteJid || participant)
         let quoted = message.message[mtype].contextInfo.quotedMessage
         if ((remoteJid && remoteJid !== 'status@broadcast') && quoted) {
         let qMtype = Object.keys(quoted)[0]
@@ -406,15 +406,15 @@ basenewkirbotz.pushMessage = async(m) => {
         const qM = {
         key: {
         remoteJid,
-        fromMe: areJidsSameUser(basenewkirbotz.user.jid, remoteJid),
+        fromMe: areJidsSameUser(sock.user.jid, remoteJid),
         id: context.stanzaId,
         participant,
         },
         message: JSON.parse(JSON.stringify(quoted)),
         ...(isGroup ? { participant } : {})
         }
-        let qChats = basenewkirbotz.chats[participant]
-        if (!qChats) qChats = basenewkirbotz.chats[participant] = { id: participant, isChats: !isGroup }
+        let qChats = sock.chats[participant]
+        if (!qChats) qChats = sock.chats[participant] = { id: participant, isChats: !isGroup }
         if (!qChats.messages) qChats.messages = {}
         if (!qChats.messages[context.stanzaId] && !qM.key.fromMe) qChats.messages[context.stanzaId] = qM
         let qChatsMessages
@@ -423,29 +423,29 @@ basenewkirbotz.pushMessage = async(m) => {
         }
         if (!chat || chat === 'status@broadcast') continue
         const isGroup = chat.endsWith('@g.us')
-        let chats = basenewkirbotz.chats[chat]
+        let chats = sock.chats[chat]
         if (!chats) {
-        if (isGroup) await basenewkirbotz.insertAllGroup().catch(console.error)
-        chats = basenewkirbotz.chats[chat] = { id: chat, isChats: true, ...(basenewkirbotz.chats[chat] || {}) }
+        if (isGroup) await sock.insertAllGroup().catch(console.error)
+        chats = sock.chats[chat] = { id: chat, isChats: true, ...(sock.chats[chat] || {}) }
         }
         let metadata, sender
         if (isGroup) {
         if (!chats.subject || !chats.metadata) {
-        metadata = await basenewkirbotz.groupMetadata(chat).catch(_ => ({})) || {}
+        metadata = await sock.groupMetadata(chat).catch(_ => ({})) || {}
         if (!chats.subject) chats.subject = metadata.subject || ''
         if (!chats.metadata) chats.metadata = metadata
         }
-        sender = basenewkirbotz.decodeJid(message.key?.fromMe && basenewkirbotz.user.id || message.participant || message.key?.participant || chat || '')
+        sender = sock.decodeJid(message.key?.fromMe && sock.user.id || message.participant || message.key?.participant || chat || '')
         if (sender !== chat) {
-        let chats = basenewkirbotz.chats[sender]
-        if (!chats) chats = basenewkirbotz.chats[sender] = { id: sender }
+        let chats = sock.chats[sender]
+        if (!chats) chats = sock.chats[sender] = { id: sender }
         if (!chats.name) chats.name = message.pushName || chats.name || ''
         }
         } else if (!chats.name) chats.name = message.pushName || chats.name || ''
         if (['senderKeyDistributionMessage', 'messageContextInfo'].includes(mtype)) continue
         chats.isChats = true
         if (!chats.messages) chats.messages = {}
-        const fromMe = message.key.fromMe || areJidsSameUser(sender || chat, basenewkirbotz.user.id)
+        const fromMe = message.key.fromMe || areJidsSameUser(sender || chat, sock.user.id)
         if (!['protocolMessage'].includes(mtype) && !fromMe && message.messageStubType != WAMessageStubType.CIPHERTEXT && message.message) {
         delete message.message.messageContextInfo
         delete message.message.senderKeyDistributionMessage
@@ -459,8 +459,8 @@ basenewkirbotz.pushMessage = async(m) => {
         }
 }
     
-basenewkirbotz.getBusinessProfile = async (jid) => {
-        const results = await basenewkirbotz.query({
+sock.getBusinessProfile = async (jid) => {
+        const results = await sock.query({
         tag: 'iq',
         attrs: {
         to: 's.whatsapp.net',
@@ -493,7 +493,7 @@ basenewkirbotz.getBusinessProfile = async (jid) => {
         }
 }
 
-basenewkirbotz.msToDate = (ms) => {
+sock.msToDate = (ms) => {
         let days = Math.floor(ms / (24 * 60 * 60 * 1000))
         let daysms = ms % (24 * 60 * 60 * 1000)
         let hours = Math.floor((daysms) / (60 * 60 * 1000))
@@ -504,36 +504,36 @@ basenewkirbotz.msToDate = (ms) => {
         return days + " Hari " + hours + " Jam " + minutes + " Menit"
 }
     
-basenewkirbotz.msToTime = (ms) => {
+sock.msToTime = (ms) => {
         let h = isNaN(ms) ? '--' : Math.floor(ms / 3600000)
         let m = isNaN(ms) ? '--' : Math.floor(ms / 60000) % 60
         let s = isNaN(ms) ? '--' : Math.floor(ms / 1000) % 60
         return [h + ' Jam ', m + ' Menit ', s + ' Detik'].map(v => v.toString().padStart(2, 0)).join(' ')
 }
     
-basenewkirbotz.msToHour = (ms) => {
+sock.msToHour = (ms) => {
         let h = isNaN(ms) ? '--' : Math.floor(ms / 3600000)
         return [h + ' Jam '].map(v => v.toString().padStart(2, 0)).join(' ')
 }
     
-basenewkirbotz.msToMinute = (ms) => {
+sock.msToMinute = (ms) => {
         let m = isNaN(ms) ? '--' : Math.floor(ms / 60000) % 60
         return [m + ' Menit '].map(v => v.toString().padStart(2, 0)).join(' ')
 }
     
-basenewkirbotz.msToSecond = (ms) => {
+sock.msToSecond = (ms) => {
         let s = isNaN(ms) ? '--' : Math.floor(ms / 1000) % 60
         return [s + ' Detik'].map(v => v.toString().padStart(2, 0)).join(' ')
 }
 
-basenewkirbotz.clockString = (ms) => {
+sock.clockString = (ms) => {
         let h = isNaN(ms) ? '--' : Math.floor(ms / 3600000)
         let m = isNaN(ms) ? '--' : Math.floor(ms / 60000) % 60
         let s = isNaN(ms) ? '--' : Math.floor(ms / 1000) % 60
         return [h + ' Jam ', m + ' Menit ', s + ' Detik'].map(v => v.toString().padStart(2, 0)).join(' ')
 }
     
-basenewkirbotz.join = (arr) => {
+sock.join = (arr) => {
         let construct = []
         for (let i = 0; i < arr.length; i++) {
         construct = construct.concat(arr[i])
@@ -541,15 +541,15 @@ basenewkirbotz.join = (arr) => {
         return construct
 }
 
-basenewkirbotz.pickRandom = (list) => {
+sock.pickRandom = (list) => {
         return list[Math.floor(list.length * Math.random())]
 }
 
-basenewkirbotz.delay = (ms) => {
+sock.delay = (ms) => {
         return new Promise((resolve, reject) => setTimeout(resolve, ms))
 }
 
-basenewkirbotz.filter = (text) => {
+sock.filter = (text) => {
         let mati = ["q", "w", "r", "t", "y", "p", "s", "d", "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"]
         if (/[aiueo][aiueo]([qwrtypsdfghjklzxcvbnm])?$/i.test(text)) return text.substring(text.length - 1)
         else {
@@ -565,48 +565,48 @@ basenewkirbotz.filter = (text) => {
         }
 }
 
-basenewkirbotz.format = (...args) => {
+sock.format = (...args) => {
         return util.format(...args)
 }
     
-basenewkirbotz.serializeM = (m) => {
-        return exports.smsg(basenewkirbotz, m)
+sock.serializeM = (m) => {
+        return exports.smsg(sock, m)
 }
 
-basenewkirbotz.sendText = (jid, text, quoted = '', options) => basenewkirbotz.sendMessage(jid, { text: text, ...options }, { quoted })
+sock.sendText = (jid, text, quoted = '', options) => sock.sendMessage(jid, { text: text, ...options }, { quoted })
     
-basenewkirbotz.sendImage = async (jid, path, caption = '', setquoted, options) => {
+sock.sendImage = async (jid, path, caption = '', setquoted, options) => {
         let buffer = Buffer.isBuffer(path) ? path : await getBuffer(path)
-        return await basenewkirbotz.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted : setquoted})
+        return await sock.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted : setquoted})
 }
     
-basenewkirbotz.sendVideo = async (jid, yo, caption = '', quoted = '', gif = false, options) => {
-        return await basenewkirbotz.sendMessage(jid, { video: yo, caption: caption, gifPlayback: gif, ...options }, { quoted })
+sock.sendVideo = async (jid, yo, caption = '', quoted = '', gif = false, options) => {
+        return await sock.sendMessage(jid, { video: yo, caption: caption, gifPlayback: gif, ...options }, { quoted })
 }
     
-basenewkirbotz.sendAudio = async (jid, path, quoted = '', ptt = false, options) => {
+sock.sendAudio = async (jid, path, quoted = '', ptt = false, options) => {
         let buffer = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
-        return await basenewkirbotz.sendMessage(jid, { audio: buffer, ptt: ptt, ...options }, { quoted })
+        return await sock.sendMessage(jid, { audio: buffer, ptt: ptt, ...options }, { quoted })
 }
     
-basenewkirbotz.sendTextWithMentions = async (jid, text, quoted, options = {}) => basenewkirbotz.sendMessage(jid, { text: text, contextInfo: { mentionedJid: [...text.matchAll(/@(\d{0,16})/g)].map(v => v[1] + '@s.whatsapp.net') }, ...options }, { quoted })
+sock.sendTextWithMentions = async (jid, text, quoted, options = {}) => sock.sendMessage(jid, { text: text, contextInfo: { mentionedJid: [...text.matchAll(/@(\d{0,16})/g)].map(v => v[1] + '@s.whatsapp.net') }, ...options }, { quoted })
     
-basenewkirbotz.sendGroupV4Invite = async(jid, participant, inviteCode, inviteExpiration, groupName = 'unknown subject', jpegThumbnail, caption = 'Invitation to join my WhatsApp group', options = {}) => {
+sock.sendGroupV4Invite = async(jid, participant, inviteCode, inviteExpiration, groupName = 'unknown subject', jpegThumbnail, caption = 'Invitation to join my WhatsApp group', options = {}) => {
         let msg = WAProto.Message.fromObject({
         groupInviteMessage: WAProto.GroupInviteMessage.fromObject({
         inviteCode,
         inviteExpiration: inviteExpiration ? parseInt(inviteExpiration) : + new Date(new Date + (3 * 86400000)),
         groupJid: jid,
-        groupName: groupName ? groupName : (await basenewkirbotz.groupMetadata(jid)).subject,
+        groupName: groupName ? groupName : (await sock.groupMetadata(jid)).subject,
         jpegThumbnail: jpegThumbnail ? (await getBuffer(jpegThumbnail)).buffer : '',
         caption
         })
         })
         const m = generateWAMessageFromContent(participant, msg, options)
-        return await basenewkirbotz.relayMessage(participant, m.message, { messageId: m.key.id })
+        return await sock.relayMessage(participant, m.message, { messageId: m.key.id })
 }
 
-basenewkirbotz.sendPoll = async (jid, title = '', but = []) => {
+sock.sendPoll = async (jid, title = '', but = []) => {
         let pollCreation = generateWAMessageFromContent(jid,
         proto.Message.fromObject({
         pollCreationMessage: {
@@ -615,10 +615,10 @@ basenewkirbotz.sendPoll = async (jid, title = '', but = []) => {
         selectableOptionsCount: but.length
         }}),
         { userJid: jid })
-        return basenewkirbotz.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id })
+        return sock.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id })
 }
 
-basenewkirbotz.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
+sock.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
     let quoted = message.msg ? message.msg : message
     let mime = (message.msg || message).mimetype || ''
     let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
@@ -634,7 +634,7 @@ basenewkirbotz.downloadAndSaveMediaMessage = async (message, filename, attachExt
     return trueFileName
 }
     
-basenewkirbotz.downloadMediaMessage = async (message) => {
+sock.downloadMediaMessage = async (message) => {
     let mime = (message.msg || message).mimetype || ''
     let messageType = message.type ? message.type.replace(/Message/gi, '') : mime.split('/')[0]
     const stream = await downloadContentFromMessage(message, messageType)
@@ -645,28 +645,28 @@ basenewkirbotz.downloadMediaMessage = async (message) => {
     return buffer
 } 
 
-basenewkirbotz.public = true
+sock.public = true
 
-Object.defineProperty(basenewkirbotz, 'name', {
+Object.defineProperty(sock, 'name', {
 value: { ...(options.chats || {}) },
 configurable: true,
 })
-if (basenewkirbotz.user?.id) basenewkirbotz.user.jid = basenewkirbotz.decodeJid(basenewkirbotz.user.id)
-store.bind(basenewkirbotz.ev)
-return basenewkirbotz
+if (sock.user?.id) sock.user.jid = sock.decodeJid(sock.user.id)
+store.bind(sock.ev)
+return sock
 }
 
-exports.smsg = (basenewkirbotz, m, hasParent) => {
+exports.smsg = (sock, m, hasParent) => {
     let M = proto.WebMessageInfo
     m = M.fromObject(m)
     if (m.key) {
     m.id = m.key.id
     m.isBaileys = m.id && m.id.length === 16 || m.id.startsWith('3EB0') && m.id.length === 12 || false
-    m.chat = basenewkirbotz.decodeJid(m.key.remoteJid || message.message?.senderKeyDistributionMessage?.groupId || '')
+    m.chat = sock.decodeJid(m.key.remoteJid || message.message?.senderKeyDistributionMessage?.groupId || '')
     m.now = m.messageTimestamp
     m.isGroup = m.chat.endsWith('@g.us')
-    m.sender = basenewkirbotz.decodeJid(m.key.fromMe && basenewkirbotz.user.id || m.participant || m.key.participant || m.chat || '')
-    m.fromMe = m.key.fromMe || areJidsSameUser(m.sender, basenewkirbotz.user.id)
+    m.sender = sock.decodeJid(m.key.fromMe && sock.user.id || m.participant || m.key.participant || m.chat || '')
+    m.fromMe = m.key.fromMe || areJidsSameUser(m.sender, sock.user.id)
     }
     if (m.message) {
     let mtype = Object.keys(m.message)
@@ -679,8 +679,8 @@ exports.smsg = (basenewkirbotz, m, hasParent) => {
     if (m.mtype == 'protocolMessage' && m.msg.key) {
     if (m.msg.key.remoteJid == 'status@broadcast') m.msg.key.remoteJid = m.chat
     if (!m.msg.key.participant || m.msg.key.participant == 'status_me') m.msg.key.participant = m.sender
-    m.msg.key.fromMe = basenewkirbotz.decodeJid(m.msg.key.participant) === basenewkirbotz.decodeJid(basenewkirbotz.user.id)
-    if (!m.msg.key.fromMe && m.msg.key.remoteJid === basenewkirbotz.decodeJid(basenewkirbotz.user.id)) m.msg.key.remoteJid = m.sender
+    m.msg.key.fromMe = sock.decodeJid(m.msg.key.participant) === sock.decodeJid(sock.user.id)
+    if (!m.msg.key.fromMe && m.msg.key.remoteJid === sock.decodeJid(sock.user.id)) m.msg.key.remoteJid = m.sender
     }
     m.text = m.msg.text || m.msg.caption || m.message.conversation || m.msg.contentText || m.msg.selectedDisplayText || m.msg.title || ''
     m.mentionedJid = m.msg?.contextInfo?.mentionedJid?.length && m.msg.contextInfo.mentionedJid || []
@@ -691,12 +691,12 @@ exports.smsg = (basenewkirbotz, m, hasParent) => {
     if (typeof m.quoted === 'string') m.quoted = { text: m.quoted }
     m.quoted.mtype = type
     m.quoted.id = m.msg.contextInfo.stanzaId
-    m.quoted.chat = basenewkirbotz.decodeJid(m.msg.contextInfo.remoteJid || m.chat || m.sender)
+    m.quoted.chat = sock.decodeJid(m.msg.contextInfo.remoteJid || m.chat || m.sender)
     m.quoted.isBaileys = m.quoted.id && m.quoted.id.length === 16 || false
-    m.quoted.sender = basenewkirbotz.decodeJid(m.msg.contextInfo.participant)
-    m.quoted.fromMe = m.quoted.sender === basenewkirbotz.user.jid
+    m.quoted.sender = sock.decodeJid(m.msg.contextInfo.participant)
+    m.quoted.fromMe = m.quoted.sender === sock.user.jid
     m.quoted.text = m.quoted.text || m.quoted.caption || m.quoted.contentText || ''
-    m.quoted.name = basenewkirbotz.getName(m.quoted.sender)
+    m.quoted.name = sock.getName(m.quoted.sender)
     m.quoted.mentionedJid = m.quoted.contextInfo?.mentionedJid?.length && m.quoted.contextInfo.mentionedJid || []
     let vM = m.quoted.fakeObj = M.fromObject({
     key: {
@@ -709,31 +709,31 @@ exports.smsg = (basenewkirbotz, m, hasParent) => {
     })
     m.getQuotedObj = m.getQuotedMessage = async () => {
     if (!m.quoted.id) return null
-    let q = M.fromObject(await basenewkirbotz.loadMessage(m.quoted.id) || vM)
-    return exports.smsg(basenewkirbotz, q)
+    let q = M.fromObject(await sock.loadMessage(m.quoted.id) || vM)
+    return exports.smsg(sock, q)
     }
-    if (m.quoted.url || m.quoted.directPath) m.quoted.download = () => basenewkirbotz.downloadMediaMessage(m.quoted)
-    m.quoted.reply = (text, chatId, options) => basenewkirbotz.reply(chatId ? chatId : m.chat, text, vM, options)
-    m.quoted.replys = (text, chatId, options) => basenewkirbotz.replys(chatId ? chatId : m.chat, text, vM, options)
-    m.quoted.copy = () => exports.smsg(basenewkirbotz, M.fromObject(M.toObject(vM)))    
-    m.quoted.forward = (jid, forceForward = false) => basenewkirbotz.forwardMessage(jid, vM, forceForward)
-    m.quoted.copyNForward = (jid, forceForward = true, options = {}) => basenewkirbotz.copyNForward(jid, vM, forceForward, options)
-    m.quoted.cMod = (jid, text = '', sender = m.quoted.sender, options = {}) => basenewkirbotz.cMod(jid, vM, text, sender, options)
-    m.quoted.delete = () => basenewkirbotz.sendMessage(m.quoted.chat, { delete: vM.key })
+    if (m.quoted.url || m.quoted.directPath) m.quoted.download = () => sock.downloadMediaMessage(m.quoted)
+    m.quoted.reply = (text, chatId, options) => sock.reply(chatId ? chatId : m.chat, text, vM, options)
+    m.quoted.replys = (text, chatId, options) => sock.replys(chatId ? chatId : m.chat, text, vM, options)
+    m.quoted.copy = () => exports.smsg(sock, M.fromObject(M.toObject(vM)))    
+    m.quoted.forward = (jid, forceForward = false) => sock.forwardMessage(jid, vM, forceForward)
+    m.quoted.copyNForward = (jid, forceForward = true, options = {}) => sock.copyNForward(jid, vM, forceForward, options)
+    m.quoted.cMod = (jid, text = '', sender = m.quoted.sender, options = {}) => sock.cMod(jid, vM, text, sender, options)
+    m.quoted.delete = () => sock.sendMessage(m.quoted.chat, { delete: vM.key })
     }
     }
-    m.name = !nullish(m.pushName) && m.pushName || basenewkirbotz.getName(m.sender)
-    if (m.msg && m.msg.url) m.download = (saveToFile = false) => basenewkirbotz.downloadM(m.msg, m.mtype.replace(/message/i, ''), saveToFile)
-    m.reply = (text, chatId, options) => basenewkirbotz.reply(chatId ? chatId : m.chat, text, m, options)
-    m.replys = (text, chatId, options) => basenewkirbotz.replys(chatId ? chatId : m.chat, text, m, options)
-    m.copyNForward = (jid = m.chat, forceForward = true, options = {}) => basenewkirbotz.copyNForward(jid, m, forceForward, options)
-    m.cMod = (jid, text = '', sender = m.sender, options = {}) => basenewkirbotz.cMod(jid, m, text, sender, options)
-    m.delete = () => basenewkirbotz.sendMessage(m.chat, { delete: m.key })
+    m.name = !nullish(m.pushName) && m.pushName || sock.getName(m.sender)
+    if (m.msg && m.msg.url) m.download = (saveToFile = false) => sock.downloadM(m.msg, m.mtype.replace(/message/i, ''), saveToFile)
+    m.reply = (text, chatId, options) => sock.reply(chatId ? chatId : m.chat, text, m, options)
+    m.replys = (text, chatId, options) => sock.replys(chatId ? chatId : m.chat, text, m, options)
+    m.copyNForward = (jid = m.chat, forceForward = true, options = {}) => sock.copyNForward(jid, m, forceForward, options)
+    m.cMod = (jid, text = '', sender = m.sender, options = {}) => sock.cMod(jid, m, text, sender, options)
+    m.delete = () => sock.sendMessage(m.chat, { delete: m.key })
     try {
-    basenewkirbotz.saveName(m.sender, m.name)
-    basenewkirbotz.pushMessage(m)
-    if (m.isGroup) basenewkirbotz.saveName(m.chat)
-    if (m.msg && m.mtype == 'protocolMessage') basenewkirbotz.ev.emit('message.delete', m.msg.key)
+    sock.saveName(m.sender, m.name)
+    sock.pushMessage(m)
+    if (m.isGroup) sock.saveName(m.chat)
+    if (m.msg && m.mtype == 'protocolMessage') sock.ev.emit('message.delete', m.msg.key)
     } catch (e) {
     console.error(e)
     }
