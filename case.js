@@ -1,6 +1,7 @@
 require('./all/module.js')
 require('./all/global.js')
 require('./all/mess.js')
+require('./all/place.js')
 module.exports = async (sock, m, neekoi, store) => {
     try {
     const from = m.key.remoteJid
