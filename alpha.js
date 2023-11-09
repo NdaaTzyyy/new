@@ -122,7 +122,7 @@ async function Botstarted() {
     } = await useMultiFileAuthState(`./${sessionName}`)
     const { version, isLatest } = await fetchLatestBaileysVersion();
     const msgRetryCounterCache = new NodeCache()
-    const connectionOptions = WADefault({
+    const sock = func.makeWASocket({
         version,
         logger: pino({ level: "fatal" }).child({ level: "fatal" }),
         printQRInTerminal: !pairingCode,
@@ -143,7 +143,7 @@ async function Botstarted() {
       defaultQueryTimeoutMs: undefined,
 
     })
-    const sock = func.makeWASocket(connectionOptions)
+    //const sock = func.makeWASocket(connectionOptions)
     require('./case')
     nocache('./case', module => console.log(` "${module}" Telah diupdate!`))
     nocache('./settings', module => console.log(` "${module}" Telah diupdate!`))
