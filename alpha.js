@@ -1,4 +1,5 @@
 require('./settings')
+const func = require('./all/place.js')
 const {
     default: WADefault,
     useMultiFileAuthState,
@@ -121,7 +122,7 @@ async function Botstarted() {
     } = await useMultiFileAuthState(`./${sessionName}`)
     const { version, isLatest } = await fetchLatestBaileysVersion();
     const msgRetryCounterCache = new NodeCache()
-    const sock = WADefault({
+    const sock = func.WADefault({
         version,
         logger: pino({ level: "fatal" }).child({ level: "fatal" }),
         printQRInTerminal: !pairingCode,
